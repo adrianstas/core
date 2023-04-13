@@ -18,6 +18,7 @@ from homeassistant.components import websocket_api
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.util import language as language_util
 
 from .const import (
     DOMAIN,
@@ -175,15 +176,16 @@ def websocket_list_engines(
     """List speech to text engines and, optionally, if they support a given language."""
     legacy_providers: dict[str, Provider] = hass.data[DOMAIN]
 
+    language = msg["language"]
     providers = {
         "providers": [
             {
-                # entity_id in preparation for migration of stt engines to entities
-                "entity_id": provider,
-                # placeholder until we have a way to handle languages
-                "language_supported": True,
+                "engine_id": engine_id,
+                "language_supported": bool(
+                    language_util.matches(language, provider.supported_languages)
+                ),
             }
-            for provider in legacy_providers
+            for engine_id, provider in legacy_providers.items()
         ]
     }
 
