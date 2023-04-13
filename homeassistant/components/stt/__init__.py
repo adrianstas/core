@@ -12,9 +12,11 @@ from aiohttp.web_exceptions import (
     HTTPNotFound,
     HTTPUnsupportedMediaType,
 )
+import voluptuous as vol
 
+from homeassistant.components import websocket_api
 from homeassistant.components.http import HomeAssistantView
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -51,6 +53,8 @@ __all__ = [
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up STT."""
+    websocket_api.async_register_command(hass, websocket_list_engines)
+
     platform_setups = async_setup_legacy(hass, config)
 
     if platform_setups:
@@ -156,3 +160,31 @@ def _metadata_from_header(request: web.Request) -> SpeechMetadata:
         )
     except TypeError as err:
         raise ValueError(f"Wrong format of X-Speech-Content: {err}") from err
+
+
+@websocket_api.websocket_command(
+    {
+        "type": "stt/engine/list",
+        vol.Optional("language"): str,
+    }
+)
+@callback
+def websocket_list_engines(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """List speech to text engines and, optionally, if they support a given language."""
+    legacy_providers: dict[str, Provider] = hass.data[DOMAIN]
+
+    providers = {
+        "providers": [
+            {
+                # entity_id in preparation for migration of stt engines to entities
+                "entity_id": provider,
+                # placeholder until we have a way to handle languages
+                "language_supported": True,
+            }
+            for provider in legacy_providers
+        ]
+    }
+
+    connection.send_message(websocket_api.result_message(msg["id"], providers))

@@ -23,7 +23,7 @@ from homeassistant.setup import async_setup_component
 
 from .common import mock_stt_platform
 
-from tests.typing import ClientSessionGenerator
+from tests.typing import ClientSessionGenerator, WebSocketGenerator
 
 
 class MockProvider(Provider):
@@ -180,3 +180,18 @@ async def test_metadata_errors(
 async def test_get_provider(hass: HomeAssistant, mock_provider: MockProvider) -> None:
     """Test we can get STT providers."""
     assert mock_provider == async_get_provider(hass, "test")
+
+
+async def test_ws_list_engines(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator
+) -> None:
+    """Test streaming audio and getting response."""
+    client = await hass_ws_client()
+
+    await client.send_json_auto_id({"type": "stt/engine/list", "language": "smurfish"})
+
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"] == {
+        "providers": [{"entity_id": "test", "language_supported": True}]
+    }
